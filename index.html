@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>患者データベース</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif; background: #f5f7fa; color: #333; font-size: 13px; }
+
+.header { background: #1a5276; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.header h1 { font-size: 18px; font-weight: 600; }
+.header-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
+.btn-primary { background: #2ecc71; color: #fff; }
+.btn-secondary { background: #ecf0f1; color: #333; }
+.btn-import { background: #3498db; color: #fff; }
+.btn-warn { background: #e74c3c; color: #fff; }
+.btn-add { background: #8e44ad; color: #fff; font-size: 14px; padding: 8px 20px; }
+.btn:hover { opacity: 0.85; }
+
+.user-bar { background: #eaf2f8; padding: 6px 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.user-bar .user-info { display: flex; align-items: center; gap: 8px; }
+.user-bar img { width: 24px; height: 24px; border-radius: 50%; }
+.role-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.role-badge.admin { background: #e74c3c; color: #fff; }
+.role-badge.editor { background: #2ecc71; color: #fff; }
+.role-badge.viewer { background: #95a5a6; color: #fff; }
+
+.toolbar { background: #fff; padding: 10px 24px; border-bottom: 1px solid #ddd; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.toolbar input, .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+.toolbar input[type="text"] { width: 250px; }
+
+.stats { padding: 8px 24px; font-size: 12px; color: #777; }
+
+.table-wrap { overflow: auto; padding: 0 16px 16px; max-height: calc(100vh - 260px); }
+table { border-collapse: separate; border-spacing: 0; width: 100%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; white-space: nowrap; }
+th { background: #2c3e50; color: #fff; font-weight: 500; position: sticky; top: 0; z-index: 10; font-size: 12px; }
+tr:hover { background: #f0f7ff; }
+tr.selected { background: #d4efdf; }
+td { font-size: 13px; }
+td.actions-cell { white-space: nowrap; }
+td.actions-cell button { margin-right: 4px; }
+
+#loginScreen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
+.login-box { background: #fff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+.login-box h2 { margin-bottom: 8px; color: #1a5276; }
+.login-box p { margin-bottom: 24px; color: #777; }
+.btn-google { background: #4285f4; color: #fff; padding: 12px 24px; font-size: 15px; border-radius: 4px; border: none; cursor: pointer; }
+.btn-google:hover { background: #3367d6; }
+
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+.modal-overlay.show { display: flex; }
+.modal { background: #fff; border-radius: 8px; padding: 24px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; }
+.modal h2 { margin-bottom: 16px; font-size: 16px; }
+.modal .form-group { margin-bottom: 12px; }
+.modal .form-group label { display: block; font-weight: 500; margin-bottom: 4px; font-size: 13px; }
+.modal .form-group input, .modal .form-group select, .modal .form-group textarea {
+  width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px;
+}
+.modal .form-group textarea { height: 60px; resize: vertical; }
+.modal .form-row { display: flex; gap: 12px; }
+.modal .form-row .form-group { flex: 1; }
+.modal .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.import-result { margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 13px; }
+.import-result.success { background: #d5f5e3; color: #1e8449; }
+.import-result.error { background: #fadbd8; color: #c0392b; }
+
+.save-status { font-size: 11px; color: #999; margin-left: 12px; }
+.save-status.saving { color: #f39c12; }
+.save-status.saved { color: #2ecc71; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-box">
+    <h2>患者データベース</h2>
+    <p>Googleアカウントでログインしてください</p>
+    <button class="btn-google" onclick="doLogin()">Googleでログイン</button>
+  </div>
+</div>
+
+<div id="mainApp" style="display:none">
+
+<div class="header">
+  <h1>患者データベース <span class="save-status" id="saveStatus"></span></h1>
+  <div class="header-actions">
+    <button class="btn btn-add" onclick="openPatientModal()" id="btnAdd">新規登録</button>
+    <button class="btn btn-import" onclick="openImportModal()" id="btnImport">CSVインポート</button>
+    <button class="btn btn-primary" onclick="exportCSV()">CSV出力</button>
+    <button class="btn btn-secondary" onclick="openAdminModal()" id="btnAdmin" style="display:none">権限管理</button>
+  </div>
+</div>
+
+<div class="user-bar">
+  <div class="user-info">
+    <img id="userPhoto" src="" alt="">
+    <span id="userName"></span>
+    <span class="role-badge" id="roleBadge"></span>
+  </div>
+  <button class="btn btn-secondary" onclick="doLogout()" style="font-size:11px;padding:4px 10px">ログアウト</button>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="searchInput" placeholder="検索（氏名・カナ・住所・電話番号）" oninput="renderTable()">
+  <select id="filterStore" onchange="renderTable()">
+    <option value="">全店舗</option>
+    <option value="柏">柏</option>
+    <option value="足立">足立</option>
+    <option value="ながれやま">ながれやま</option>
+    <option value="アイ調剤">アイ調剤</option>
+    <option value="我孫子">我孫子</option>
+    <option value="さくら台">さくら台</option>
+  </select>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="table-wrap">
+  <table id="patientTable"></table>
+</div>
+
+</div>
+
+<!-- 患者登録/編集モーダル -->
+<div class="modal-overlay" id="patientModal">
+  <div class="modal">
+    <h2 id="patientModalTitle">新規登録</h2>
+    <input type="hidden" id="editId">
+    <div class="form-row">
+      <div class="form-group"><label>患者ID</label><input type="text" id="fPatientId" placeholder="レセコンIDなど"></div>
+      <div class="form-group"><label>担当店舗</label>
+        <select id="fStore">
+          <option value="">未設定</option>
+          <option value="柏">柏</option>
+          <option value="足立">足立</option>
+          <option value="ながれやま">ながれやま</option>
+          <option value="アイ調剤">アイ調剤</option>
+          <option value="我孫子">我孫子</option>
+          <option value="さくら台">さくら台</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>氏名（漢字）</label><input type="text" id="fName"></div>
+      <div class="form-group"><label>氏名（カナ）</label><input type="text" id="fKana"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>生年月日</label><input type="date" id="fBirthday"></div>
+      <div class="form-group"><label>性別</label>
+        <select id="fGender"><option value="">未設定</option><option value="男">男</option><option value="女">女</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>郵便番号</label><input type="text" id="fZip" placeholder="000-0000"></div>
+      <div class="form-group"><label>電話番号</label><input type="text" id="fPhone"></div>
+    </div>
+    <div class="form-group"><label>住所</label><input type="text" id="fAddress"></div>
+    <div class="form-group"><label>備考</label><textarea id="fNote"></textarea></div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closePatientModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="savePatient()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSVインポートモーダル -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <h2>CSVインポート</h2>
+    <p>CSVの1行目をヘッダーとして自動マッピングします。<br>
+    対応列名: 患者ID, 氏名, カナ, 生年月日, 性別, 郵便番号, 住所, 電話番号, 担当店舗, 備考</p>
+    <p><strong>既存の患者ID</strong>が一致する場合は上書き、なければ新規追加されます。</p>
+    <input type="file" id="importFile" accept=".csv" style="margin:8px 0">
+    <div id="importResult"></div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closeImportModal()">閉じる</button>
+      <button class="btn btn-import" onclick="doImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- 権限管理モーダル -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <h2>権限管理</h2>
+    <div style="margin-bottom:12px">
+      <input type="email" id="addUserEmail" placeholder="メールアドレス" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-bottom:8px">
+      <select id="addUserRole" style="padding:6px;font-size:13px">
+        <option value="editor">編集者</option>
+        <option value="viewer">閲覧者</option>
+        <option value="admin">管理者</option>
+      </select>
+      <button class="btn btn-primary" onclick="addUser()" style="margin-left:8px">追加</button>
+    </div>
+    <div id="userList"></div>
+    <div class="btn-group"><button class="btn btn-secondary" onclick="closeAdminModal()">閉じる</button></div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+<script>
+// ===== Firebase =====
+firebase.initializeApp({
+  apiKey: "AIzaSyC1Yr7rBcBJ0ACbO6w9G8jt2S9kVZSIqiQ",
+  authDomain: "wise-patientdb.firebaseapp.com",
+  projectId: "wise-patientdb",
+  storageBucket: "wise-patientdb.firebasestorage.app",
+  messagingSenderId: "509483282243",
+  appId: "1:509483282243:web:ebb1216de76f0285b049f6"
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+let currentUser = null;
+let userRole = 'viewer';
+let patients = []; // ローカルキャッシュ
+
+// ===== 認証 =====
+function doLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert('ログインに失敗しました: ' + e.message)); }
+function doLogout() { auth.signOut(); }
+
+auth.onAuthStateChanged(async user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('userName').textContent = user.displayName || user.email;
+    document.getElementById('userPhoto').src = user.photoURL || '';
+    await checkUserRole(user);
+    applyPermissions();
+    await loadPatients();
+    renderTable();
+  } else {
+    currentUser = null;
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+  }
+});
+
+async function checkUserRole(user) {
+  const doc = await db.collection('users').doc(user.email).get();
+  if (doc.exists) { userRole = doc.data().role || 'viewer'; }
+  else {
+    const snap = await db.collection('users').get();
+    userRole = snap.empty ? 'admin' : 'viewer';
+    await db.collection('users').doc(user.email).set({ email: user.email, name: user.displayName || '', role: userRole, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }
+  const badge = document.getElementById('roleBadge');
+  badge.textContent = userRole === 'admin' ? '管理者' : userRole === 'editor' ? '編集者' : '閲覧者';
+  badge.className = 'role-badge ' + userRole;
+}
+
+function applyPermissions() {
+  const canEdit = userRole === 'admin' || userRole === 'editor';
+  document.getElementById('btnAdd').style.display = canEdit ? '' : 'none';
+  document.getElementById('btnImport').style.display = canEdit ? '' : 'none';
+  document.getElementById('btnAdmin').style.display = userRole === 'admin' ? '' : 'none';
+}
+
+// ===== 権限管理 =====
+function openAdminModal() { document.getElementById('adminModal').classList.add('show'); renderUserList(); }
+function closeAdminModal() { document.getElementById('adminModal').classList.remove('show'); }
+async function addUser() {
+  const email = document.getElementById('addUserEmail').value.trim();
+  const role = document.getElementById('addUserRole').value;
+  if (!email) return;
+  await db.collection('users').doc(email).set({ email, role, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  document.getElementById('addUserEmail').value = '';
+  renderUserList();
+}
+async function removeUser(email) {
+  if (email === currentUser.email) { alert('自分は削除できません'); return; }
+  if (!confirm(email + ' を削除しますか？')) return;
+  await db.collection('users').doc(email).delete(); renderUserList();
+}
+async function changeRole(email, newRole) { await db.collection('users').doc(email).update({ role: newRole }); renderUserList(); }
+async function renderUserList() {
+  const snap = await db.collection('users').get();
+  let html = '<table style="width:100%;min-width:auto;font-size:12px"><tr><th style="text-align:left">メール</th><th>権限</th><th>操作</th></tr>';
+  snap.forEach(doc => {
+    const u = doc.data(); const isSelf = u.email === currentUser.email;
+    html += `<tr><td style="text-align:left">${u.email}</td>
+      <td><select onchange="changeRole('${u.email}',this.value)" ${isSelf?'disabled':''} style="font-size:12px">
+        <option value="admin" ${u.role==='admin'?'selected':''}>管理者</option>
+        <option value="editor" ${u.role==='editor'?'selected':''}>編集者</option>
+        <option value="viewer" ${u.role==='viewer'?'selected':''}>閲覧者</option>
+      </select></td>
+      <td>${isSelf?'-':'<button class="btn btn-warn" style="font-size:11px;padding:2px 8px" onclick="removeUser(\''+u.email+'\')">削除</button>'}</td></tr>`;
+  });
+  document.getElementById('userList').innerHTML = html + '</table>';
+}
+
+// ===== データ読込 =====
+async function loadPatients() {
+  patients = [];
+  const snap = await db.collection('patients').orderBy('kana').get();
+  snap.forEach(doc => { patients.push({ id: doc.id, ...doc.data() }); });
+}
+
+// ===== テーブル描画 =====
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const storeFilter = document.getElementById('filterStore').value;
+
+  let filtered = patients;
+  if (storeFilter) filtered = filtered.filter(p => p.store === storeFilter);
+  if (search) {
+    filtered = filtered.filter(p =>
+      (p.name || '').toLowerCase().includes(search) ||
+      (p.kana || '').toLowerCase().includes(search) ||
+      (p.address || '').toLowerCase().includes(search) ||
+      (p.phone || '').includes(search) ||
+      (p.patientId || '').includes(search)
+    );
+  }
+
+  document.getElementById('stats').textContent = `${filtered.length}件表示 / 全${patients.length}件`;
+
+  const canEdit = userRole === 'admin' || userRole === 'editor';
+  let html = '<thead><tr><th>患者ID</th><th>氏名</th><th>カナ</th><th>生年月日</th><th>性別</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>担当店舗</th><th>備考</th>';
+  if (canEdit) html += '<th>操作</th>';
+  html += '</tr></thead><tbody>';
+
+  filtered.forEach(p => {
+    html += `<tr>
+      <td>${p.patientId || ''}</td>
+      <td>${p.name || ''}</td>
+      <td>${p.kana || ''}</td>
+      <td>${p.birthday || ''}</td>
+      <td>${p.gender || ''}</td>
+      <td>${p.zip || ''}</td>
+      <td>${p.address || ''}</td>
+      <td>${p.phone || ''}</td>
+      <td>${p.store || ''}</td>
+      <td>${(p.note || '').substring(0, 20)}${(p.note||'').length > 20 ? '...' : ''}</td>`;
+    if (canEdit) {
+      html += `<td class="actions-cell">
+        <button class="btn btn-secondary" style="font-size:11px;padding:2px 8px" onclick="editPatient('${p.id}')">編集</button>
+        <button class="btn btn-warn" style="font-size:11px;padding:2px 8px" onclick="deletePatient('${p.id}','${(p.name||'').replace(/'/g,"\\'")}')">削除</button>
+      </td>`;
+    }
+    html += '</tr>';
+  });
+
+  if (filtered.length === 0) html += '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">データがありません</td></tr>';
+  document.getElementById('patientTable').innerHTML = html + '</tbody>';
+}
+
+// ===== 患者登録/編集 =====
+function openPatientModal(editId) {
+  document.getElementById('patientModal').classList.add('show');
+  document.getElementById('patientModalTitle').textContent = editId ? '患者編集' : '新規登録';
+  document.getElementById('editId').value = editId || '';
+  if (!editId) {
+    ['fPatientId','fName','fKana','fBirthday','fGender','fZip','fPhone','fAddress','fNote','fStore'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+    });
+  }
+}
+
+function closePatientModal() { document.getElementById('patientModal').classList.remove('show'); }
+
+function editPatient(id) {
+  const p = patients.find(x => x.id === id);
+  if (!p) return;
+  openPatientModal(id);
+  document.getElementById('fPatientId').value = p.patientId || '';
+  document.getElementById('fName').value = p.name || '';
+  document.getElementById('fKana').value = p.kana || '';
+  document.getElementById('fBirthday').value = p.birthday || '';
+  document.getElementById('fGender').value = p.gender || '';
+  document.getElementById('fZip').value = p.zip || '';
+  document.getElementById('fPhone').value = p.phone || '';
+  document.getElementById('fAddress').value = p.address || '';
+  document.getElementById('fNote').value = p.note || '';
+  document.getElementById('fStore').value = p.store || '';
+}
+
+async function savePatient() {
+  const editId = document.getElementById('editId').value;
+  const data = {
+    patientId: document.getElementById('fPatientId').value.trim(),
+    name: document.getElementById('fName').value.trim(),
+    kana: document.getElementById('fKana').value.trim(),
+    birthday: document.getElementById('fBirthday').value,
+    gender: document.getElementById('fGender').value,
+    zip: document.getElementById('fZip').value.trim(),
+    phone: document.getElementById('fPhone').value.trim(),
+    address: document.getElementById('fAddress').value.trim(),
+    note: document.getElementById('fNote').value.trim(),
+    store: document.getElementById('fStore').value,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: currentUser.email
+  };
+
+  if (!data.name) { alert('氏名を入力してください'); return; }
+
+  try {
+    if (editId) {
+      await db.collection('patients').doc(editId).update(data);
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('patients').add(data);
+    }
+    closePatientModal();
+    await loadPatients();
+    renderTable();
+  } catch(e) { alert('保存エラー: ' + e.message); }
+}
+
+async function deletePatient(id, name) {
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  try {
+    await db.collection('patients').doc(id).delete();
+    await loadPatients();
+    renderTable();
+  } catch(e) { alert('削除エラー: ' + e.message); }
+}
+
+// ===== CSV出力 =====
+function exportCSV() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const storeFilter = document.getElementById('filterStore').value;
+  let filtered = patients;
+  if (storeFilter) filtered = filtered.filter(p => p.store === storeFilter);
+  if (search) filtered = filtered.filter(p =>
+    (p.name||'').toLowerCase().includes(search) || (p.kana||'').toLowerCase().includes(search) ||
+    (p.address||'').toLowerCase().includes(search) || (p.phone||'').includes(search) || (p.patientId||'').includes(search)
+  );
+
+  const bom = '\uFEFF';
+  let csv = '"患者ID","氏名","カナ","生年月日","性別","郵便番号","住所","電話番号","担当店舗","備考"\n';
+  filtered.forEach(p => {
+    csv += `"${p.patientId||''}","${p.name||''}","${p.kana||''}","${p.birthday||''}","${p.gender||''}","${p.zip||''}","${p.address||''}","${p.phone||''}","${p.store||''}","${(p.note||'').replace(/"/g,'""')}"\n`;
+  });
+
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `患者データ_${storeFilter || '全店舗'}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ===== CSVインポート =====
+function openImportModal() { document.getElementById('importModal').classList.add('show'); document.getElementById('importResult').innerHTML = ''; document.getElementById('importFile').value = ''; }
+function closeImportModal() { document.getElementById('importModal').classList.remove('show'); }
+
+function parseCSVLine(line) {
+  const result = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) { if (c === '"' && line[i+1] === '"') { cur += '"'; i++; } else if (c === '"') inQ = false; else cur += c; }
+    else { if (c === '"') inQ = true; else if (c === ',') { result.push(cur.trim()); cur = ''; } else cur += c; }
+  }
+  result.push(cur.trim()); return result;
+}
+
+const COL_MAP = {
+  '患者id': 'patientId', '患者ID': 'patientId', 'id': 'patientId', 'ID': 'patientId',
+  '氏名': 'name', '名前': 'name', '漢字': 'name', '氏名（漢字）': 'name',
+  'カナ': 'kana', 'フリガナ': 'kana', '氏名（カナ）': 'kana', 'かな': 'kana',
+  '生年月日': 'birthday', '誕生日': 'birthday',
+  '性別': 'gender',
+  '郵便番号': 'zip', '〒': 'zip',
+  '住所': 'address',
+  '電話番号': 'phone', '電話': 'phone', 'TEL': 'phone',
+  '担当店舗': 'store', '店舗': 'store',
+  '備考': 'note', 'メモ': 'note',
+};
+
+async function doImport() {
+  const fileInput = document.getElementById('importFile');
+  const resultDiv = document.getElementById('importResult');
+  if (!fileInput.files.length) { resultDiv.innerHTML = '<div class="import-result error">ファイルを選択してください</div>'; return; }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const text = e.target.result.replace(/^\uFEFF/, '');
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
+
+    // ヘッダー解析
+    const headers = parseCSVLine(lines[0]);
+    const colIdx = {};
+    headers.forEach((h, i) => {
+      const clean = h.replace(/^"|"$/g, '').trim();
+      if (COL_MAP[clean]) colIdx[COL_MAP[clean]] = i;
+    });
+
+    let added = 0, updated = 0, skipped = 0;
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      if (cols.length < 2) continue;
+
+      const data = {};
+      Object.entries(colIdx).forEach(([field, idx]) => {
+        if (cols[idx] !== undefined) data[field] = cols[idx].replace(/^"|"$/g, '');
+      });
+
+      if (!data.name && !data.patientId) { skipped++; continue; }
+
+      data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      data.updatedBy = currentUser.email;
+
+      // 患者IDで既存チェック
+      if (data.patientId) {
+        const existing = patients.find(p => p.patientId === data.patientId);
+        if (existing) {
+          await db.collection('patients').doc(existing.id).update(data);
+          updated++;
+          continue;
+        }
+      }
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('patients').add(data);
+      added++;
+    }
+
+    await loadPatients();
+    renderTable();
+    resultDiv.innerHTML = `<div class="import-result success">完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+  };
+  reader.readAsText(fileInput.files[0], 'UTF-8');
+}
+</script>
+</body>
+</html>
