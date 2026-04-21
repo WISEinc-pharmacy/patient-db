@@ -17,6 +17,7 @@ body { font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif; background: #f5f7fa;
 .btn-import { background: #3498db; color: #fff; }
 .btn-warn { background: #e74c3c; color: #fff; }
 .btn-add { background: #8e44ad; color: #fff; font-size: 14px; padding: 8px 20px; }
+.btn-billing { background: #e67e22; color: #fff; }
 .btn:hover { opacity: 0.85; }
 
 .user-bar { background: #eaf2f8; padding: 6px 24px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
@@ -27,21 +28,26 @@ body { font-family: 'Segoe UI', 'Yu Gothic UI', sans-serif; background: #f5f7fa;
 .role-badge.editor { background: #2ecc71; color: #fff; }
 .role-badge.viewer { background: #95a5a6; color: #fff; }
 
+.tab-bar { background: #fff; border-bottom: 2px solid #1a5276; display: flex; }
+.tab-bar button { padding: 10px 24px; border: none; background: none; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tab-bar button.active { color: #1a5276; border-bottom-color: #1a5276; font-weight: 700; }
+.tab-bar button:hover { background: #f0f4f8; }
+
 .toolbar { background: #fff; padding: 10px 24px; border-bottom: 1px solid #ddd; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .toolbar input, .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
 .toolbar input[type="text"] { width: 250px; }
 
 .stats { padding: 8px 24px; font-size: 12px; color: #777; }
 
-.table-wrap { overflow: auto; padding: 0 16px 16px; max-height: calc(100vh - 260px); }
+.table-wrap { overflow: auto; padding: 0 16px 16px; max-height: calc(100vh - 300px); }
 table { border-collapse: separate; border-spacing: 0; width: 100%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; white-space: nowrap; }
 th { background: #2c3e50; color: #fff; font-weight: 500; position: sticky; top: 0; z-index: 10; font-size: 12px; }
 tr:hover { background: #f0f7ff; }
-tr.selected { background: #d4efdf; }
 td { font-size: 13px; }
 td.actions-cell { white-space: nowrap; }
 td.actions-cell button { margin-right: 4px; }
+td.num { text-align: right; font-family: 'Consolas', monospace; }
 
 #loginScreen { display: flex; justify-content: center; align-items: center; min-height: 80vh; }
 .login-box { background: #fff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
@@ -66,10 +72,7 @@ td.actions-cell button { margin-right: 4px; }
 .import-result { margin-top: 12px; padding: 10px; border-radius: 4px; font-size: 13px; }
 .import-result.success { background: #d5f5e3; color: #1e8449; }
 .import-result.error { background: #fadbd8; color: #c0392b; }
-
 .save-status { font-size: 11px; color: #999; margin-left: 12px; }
-.save-status.saving { color: #f39c12; }
-.save-status.saved { color: #2ecc71; }
 </style>
 </head>
 <body>
@@ -89,6 +92,7 @@ td.actions-cell button { margin-right: 4px; }
   <div class="header-actions">
     <button class="btn btn-add" onclick="openPatientModal()" id="btnAdd">新規登録</button>
     <button class="btn btn-import" onclick="openImportModal()" id="btnImport">CSVインポート</button>
+    <button class="btn btn-billing" onclick="openBillingImportModal()" id="btnBillingImport">請求CSV取込</button>
     <button class="btn btn-primary" onclick="exportCSV()">CSV出力</button>
     <button class="btn btn-secondary" onclick="openAdminModal()" id="btnAdmin" style="display:none">権限管理</button>
   </div>
@@ -103,23 +107,42 @@ td.actions-cell button { margin-right: 4px; }
   <button class="btn btn-secondary" onclick="doLogout()" style="font-size:11px;padding:4px 10px">ログアウト</button>
 </div>
 
-<div class="toolbar">
-  <input type="text" id="searchInput" placeholder="検索（氏名・カナ・住所・電話番号）" oninput="renderTable()">
-  <select id="filterStore" onchange="renderTable()">
-    <option value="">全店舗</option>
-    <option value="柏">柏</option>
-    <option value="足立">足立</option>
-    <option value="ながれやま">ながれやま</option>
-    <option value="アイ調剤">アイ調剤</option>
-    <option value="我孫子">我孫子</option>
-    <option value="さくら台">さくら台</option>
-  </select>
+<div class="tab-bar">
+  <button class="active" onclick="switchTab('patients')">患者マスター</button>
+  <button onclick="switchTab('billing')">請求データ</button>
 </div>
 
-<div class="stats" id="stats"></div>
+<!-- 患者マスタータブ -->
+<div id="tabPatients">
+  <div class="toolbar">
+    <input type="text" id="searchInput" placeholder="検索（氏名・カナ・住所・電話番号）" oninput="renderTable()">
+    <select id="filterStore" onchange="renderTable()">
+      <option value="">全店舗</option>
+      <option value="柏">柏</option>
+      <option value="足立">足立</option>
+      <option value="ながれやま">ながれやま</option>
+      <option value="アイ調剤">アイ調剤</option>
+      <option value="我孫子">我孫子</option>
+      <option value="さくら台">さくら台</option>
+    </select>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="table-wrap"><table id="patientTable"></table></div>
+</div>
 
-<div class="table-wrap">
-  <table id="patientTable"></table>
+<!-- 請求データタブ -->
+<div id="tabBilling" style="display:none">
+  <div class="toolbar">
+    <input type="text" id="billingSearch" placeholder="検索（患者名・施設名）" oninput="renderBillingTable()">
+    <select id="filterPeriod" onchange="renderBillingTable()">
+      <option value="">全期間</option>
+    </select>
+    <select id="filterFacility" onchange="renderBillingTable()">
+      <option value="">全施設</option>
+    </select>
+  </div>
+  <div class="stats" id="billingStats"></div>
+  <div class="table-wrap"><table id="billingTable"></table></div>
 </div>
 
 </div>
@@ -158,6 +181,7 @@ td.actions-cell button { margin-right: 4px; }
       <div class="form-group"><label>電話番号</label><input type="text" id="fPhone"></div>
     </div>
     <div class="form-group"><label>住所</label><input type="text" id="fAddress"></div>
+    <div class="form-group"><label>施設名</label><input type="text" id="fFacility" placeholder="訪問先の施設名"></div>
     <div class="form-group"><label>備考</label><textarea id="fNote"></textarea></div>
     <div class="btn-group">
       <button class="btn btn-secondary" onclick="closePatientModal()">キャンセル</button>
@@ -166,18 +190,47 @@ td.actions-cell button { margin-right: 4px; }
   </div>
 </div>
 
-<!-- CSVインポートモーダル -->
+<!-- CSVインポートモーダル（患者マスター） -->
 <div class="modal-overlay" id="importModal">
   <div class="modal">
-    <h2>CSVインポート</h2>
+    <h2>CSVインポート（患者マスター）</h2>
     <p>CSVの1行目をヘッダーとして自動マッピングします。<br>
-    対応列名: 患者ID, 氏名, カナ, 生年月日, 性別, 郵便番号, 住所, 電話番号, 担当店舗, 備考</p>
-    <p><strong>既存の患者ID</strong>が一致する場合は上書き、なければ新規追加されます。</p>
-    <input type="file" id="importFile" accept=".csv" style="margin:8px 0">
+    対応列名: 患者ID, 氏名/患者名, カナ, 生年月日, 性別, 郵便番号, 住所, 電話番号, 担当店舗, 施設, 備考</p>
+    <p><strong>患者ID</strong>が一致する場合は上書き。IDなしの場合は氏名+カナで照合します。</p>
+    <input type="file" id="importFile" accept=".csv,.txt" style="margin:8px 0">
     <div id="importResult"></div>
     <div class="btn-group">
       <button class="btn btn-secondary" onclick="closeImportModal()">閉じる</button>
       <button class="btn btn-import" onclick="doImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- 請求CSVインポートモーダル -->
+<div class="modal-overlay" id="billingImportModal">
+  <div class="modal">
+    <h2>請求CSVインポート</h2>
+    <p>レセプト集計CSVを取り込みます。患者名で既存マスターと自動照合します。</p>
+    <div class="form-group">
+      <label>対象年月</label>
+      <input type="month" id="billingPeriod" value="">
+    </div>
+    <div class="form-group">
+      <label>担当店舗</label>
+      <select id="billingStore">
+        <option value="柏">柏</option>
+        <option value="足立">足立</option>
+        <option value="ながれやま">ながれやま</option>
+        <option value="アイ調剤">アイ調剤</option>
+        <option value="我孫子">我孫子</option>
+        <option value="さくら台">さくら台</option>
+      </select>
+    </div>
+    <input type="file" id="billingFile" accept=".csv,.txt" style="margin:8px 0">
+    <div id="billingImportResult"></div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="closeBillingImportModal()">閉じる</button>
+      <button class="btn btn-billing" onclick="doBillingImport()">取込実行</button>
     </div>
   </div>
 </div>
@@ -218,7 +271,39 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 let currentUser = null;
 let userRole = 'viewer';
-let patients = []; // ローカルキャッシュ
+let patients = [];
+let billingData = [];
+
+// ===== 半角カナ→全角カナ変換 =====
+function hankakuToZenkaku(str) {
+  const kanaMap = {
+    'ｧ':'ァ','ｨ':'ィ','ｩ':'ゥ','ｪ':'ェ','ｫ':'ォ','ｬ':'ャ','ｭ':'ュ','ｮ':'ョ','ｯ':'ッ',
+    'ｰ':'ー','ｱ':'ア','ｲ':'イ','ｳ':'ウ','ｴ':'エ','ｵ':'オ','ｶ':'カ','ｷ':'キ','ｸ':'ク','ｹ':'ケ','ｺ':'コ',
+    'ｻ':'サ','ｼ':'シ','ｽ':'ス','ｾ':'セ','ｿ':'ソ','ﾀ':'タ','ﾁ':'チ','ﾂ':'ツ','ﾃ':'テ','ﾄ':'ト',
+    'ﾅ':'ナ','ﾆ':'ニ','ﾇ':'ヌ','ﾈ':'ネ','ﾉ':'ノ','ﾊ':'ハ','ﾋ':'ヒ','ﾌ':'フ','ﾍ':'ヘ','ﾎ':'ホ',
+    'ﾏ':'マ','ﾐ':'ミ','ﾑ':'ム','ﾒ':'メ','ﾓ':'モ','ﾔ':'ヤ','ﾕ':'ユ','ﾖ':'ヨ',
+    'ﾗ':'ラ','ﾘ':'リ','ﾙ':'ル','ﾚ':'レ','ﾛ':'ロ','ﾜ':'ワ','ﾝ':'ン','ﾞ':'゛','ﾟ':'゜'
+  };
+  const dakuten = {'カ':'ガ','キ':'ギ','ク':'グ','ケ':'ゲ','コ':'ゴ','サ':'ザ','シ':'ジ','ス':'ズ','セ':'ゼ','ソ':'ゾ',
+    'タ':'ダ','チ':'ヂ','ツ':'ヅ','テ':'デ','ト':'ド','ハ':'バ','ヒ':'ビ','フ':'ブ','ヘ':'ベ','ホ':'ボ','ウ':'ヴ'};
+  const handakuten = {'ハ':'パ','ヒ':'ピ','フ':'プ','ヘ':'ペ','ホ':'ポ'};
+
+  let result = '';
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    const next = str[i + 1];
+    const zen = kanaMap[c];
+    if (zen) {
+      if (next === 'ﾞ' && dakuten[zen]) { result += dakuten[zen]; i++; }
+      else if (next === 'ﾟ' && handakuten[zen]) { result += handakuten[zen]; i++; }
+      else { result += zen; }
+    } else {
+      // 半角スペース→全角スペースはしない（そのまま）
+      result += c;
+    }
+  }
+  return result;
+}
 
 // ===== 認証 =====
 function doLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e => alert('ログインに失敗しました: ' + e.message)); }
@@ -259,7 +344,24 @@ function applyPermissions() {
   const canEdit = userRole === 'admin' || userRole === 'editor';
   document.getElementById('btnAdd').style.display = canEdit ? '' : 'none';
   document.getElementById('btnImport').style.display = canEdit ? '' : 'none';
+  document.getElementById('btnBillingImport').style.display = canEdit ? '' : 'none';
   document.getElementById('btnAdmin').style.display = userRole === 'admin' ? '' : 'none';
+}
+
+// ===== タブ切替 =====
+function switchTab(tab) {
+  document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+  if (tab === 'patients') {
+    document.querySelector('.tab-bar button:nth-child(1)').classList.add('active');
+    document.getElementById('tabPatients').style.display = '';
+    document.getElementById('tabBilling').style.display = 'none';
+  } else {
+    document.querySelector('.tab-bar button:nth-child(2)').classList.add('active');
+    document.getElementById('tabPatients').style.display = 'none';
+    document.getElementById('tabBilling').style.display = '';
+    if (billingData.length === 0) loadBillingData();
+    else renderBillingTable();
+  }
 }
 
 // ===== 権限管理 =====
@@ -302,11 +404,24 @@ async function loadPatients() {
   snap.forEach(doc => { patients.push({ id: doc.id, ...doc.data() }); });
 }
 
-// ===== テーブル描画 =====
+async function loadBillingData() {
+  billingData = [];
+  const snap = await db.collection('billing').orderBy('name').get();
+  snap.forEach(doc => { billingData.push({ id: doc.id, ...doc.data() }); });
+  // フィルター選択肢を生成
+  const periods = [...new Set(billingData.map(b => b.period).filter(Boolean))].sort().reverse();
+  const facilities = [...new Set(billingData.map(b => b.facility).filter(Boolean))].sort();
+  const periodSelect = document.getElementById('filterPeriod');
+  periodSelect.innerHTML = '<option value="">全期間</option>' + periods.map(p => `<option value="${p}">${p}</option>`).join('');
+  const facilitySelect = document.getElementById('filterFacility');
+  facilitySelect.innerHTML = '<option value="">全施設</option>' + facilities.map(f => `<option value="${f}">${f}</option>`).join('');
+  renderBillingTable();
+}
+
+// ===== 患者テーブル描画 =====
 function renderTable() {
   const search = document.getElementById('searchInput').value.toLowerCase();
   const storeFilter = document.getElementById('filterStore').value;
-
   let filtered = patients;
   if (storeFilter) filtered = filtered.filter(p => p.store === storeFilter);
   if (search) {
@@ -315,14 +430,14 @@ function renderTable() {
       (p.kana || '').toLowerCase().includes(search) ||
       (p.address || '').toLowerCase().includes(search) ||
       (p.phone || '').includes(search) ||
-      (p.patientId || '').includes(search)
+      (p.patientId || '').includes(search) ||
+      (p.facility || '').toLowerCase().includes(search)
     );
   }
 
   document.getElementById('stats').textContent = `${filtered.length}件表示 / 全${patients.length}件`;
-
   const canEdit = userRole === 'admin' || userRole === 'editor';
-  let html = '<thead><tr><th>患者ID</th><th>氏名</th><th>カナ</th><th>生年月日</th><th>性別</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>担当店舗</th><th>備考</th>';
+  let html = '<thead><tr><th>患者ID</th><th>氏名</th><th>カナ</th><th>生年月日</th><th>性別</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>店舗</th><th>施設</th><th>備考</th>';
   if (canEdit) html += '<th>操作</th>';
   html += '</tr></thead><tbody>';
 
@@ -337,6 +452,7 @@ function renderTable() {
       <td>${p.address || ''}</td>
       <td>${p.phone || ''}</td>
       <td>${p.store || ''}</td>
+      <td>${p.facility || ''}</td>
       <td>${(p.note || '').substring(0, 20)}${(p.note||'').length > 20 ? '...' : ''}</td>`;
     if (canEdit) {
       html += `<td class="actions-cell">
@@ -346,9 +462,52 @@ function renderTable() {
     }
     html += '</tr>';
   });
-
-  if (filtered.length === 0) html += '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">データがありません</td></tr>';
+  if (filtered.length === 0) html += '<tr><td colspan="12" style="text-align:center;color:#999;padding:20px">データがありません</td></tr>';
   document.getElementById('patientTable').innerHTML = html + '</tbody>';
+}
+
+// ===== 請求データテーブル描画 =====
+function renderBillingTable() {
+  const search = (document.getElementById('billingSearch').value || '').toLowerCase();
+  const periodFilter = document.getElementById('filterPeriod').value;
+  const facilityFilter = document.getElementById('filterFacility').value;
+
+  let filtered = billingData;
+  if (periodFilter) filtered = filtered.filter(b => b.period === periodFilter);
+  if (facilityFilter) filtered = filtered.filter(b => b.facility === facilityFilter);
+  if (search) filtered = filtered.filter(b =>
+    (b.name || '').toLowerCase().includes(search) || (b.facility || '').toLowerCase().includes(search)
+  );
+
+  // 集計
+  const totalBilled = filtered.reduce((s, b) => s + (b.billedAmount || 0), 0);
+  const totalPaid = filtered.reduce((s, b) => s + (b.paidAmount || 0), 0);
+  const totalUnpaid = filtered.reduce((s, b) => s + (b.unpaidAmount || 0), 0);
+  document.getElementById('billingStats').textContent =
+    `${filtered.length}件 | 請求計: ${totalBilled.toLocaleString()}円 | 入金計: ${totalPaid.toLocaleString()}円 | 未収計: ${totalUnpaid.toLocaleString()}円`;
+
+  let html = `<thead><tr>
+    <th>年月</th><th>患者名</th><th>カナ</th><th>保険種</th><th>回数</th><th>施設</th>
+    <th>請求額</th><th>入金額</th><th>未収</th><th>保険計</th><th>店舗</th>
+  </tr></thead><tbody>`;
+
+  filtered.forEach(b => {
+    html += `<tr>
+      <td>${b.period || ''}</td>
+      <td>${b.name || ''}</td>
+      <td>${b.kana || ''}</td>
+      <td>${b.insuranceType || ''}</td>
+      <td class="num">${b.visits || ''}</td>
+      <td>${b.facility || ''}</td>
+      <td class="num">${(b.billedAmount || 0).toLocaleString()}</td>
+      <td class="num">${(b.paidAmount || 0).toLocaleString()}</td>
+      <td class="num">${(b.unpaidAmount || 0).toLocaleString()}</td>
+      <td class="num">${(b.insuranceTotal || 0).toLocaleString()}</td>
+      <td>${b.store || ''}</td>
+    </tr>`;
+  });
+  if (filtered.length === 0) html += '<tr><td colspan="11" style="text-align:center;color:#999;padding:20px">データがありません</td></tr>';
+  document.getElementById('billingTable').innerHTML = html + '</tbody>';
 }
 
 // ===== 患者登録/編集 =====
@@ -357,13 +516,12 @@ function openPatientModal(editId) {
   document.getElementById('patientModalTitle').textContent = editId ? '患者編集' : '新規登録';
   document.getElementById('editId').value = editId || '';
   if (!editId) {
-    ['fPatientId','fName','fKana','fBirthday','fGender','fZip','fPhone','fAddress','fNote','fStore'].forEach(id => {
+    ['fPatientId','fName','fKana','fBirthday','fGender','fZip','fPhone','fAddress','fFacility','fNote','fStore'].forEach(id => {
       const el = document.getElementById(id);
       if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
     });
   }
 }
-
 function closePatientModal() { document.getElementById('patientModal').classList.remove('show'); }
 
 function editPatient(id) {
@@ -378,6 +536,7 @@ function editPatient(id) {
   document.getElementById('fZip').value = p.zip || '';
   document.getElementById('fPhone').value = p.phone || '';
   document.getElementById('fAddress').value = p.address || '';
+  document.getElementById('fFacility').value = p.facility || '';
   document.getElementById('fNote').value = p.note || '';
   document.getElementById('fStore').value = p.store || '';
 }
@@ -393,21 +552,16 @@ async function savePatient() {
     zip: document.getElementById('fZip').value.trim(),
     phone: document.getElementById('fPhone').value.trim(),
     address: document.getElementById('fAddress').value.trim(),
+    facility: document.getElementById('fFacility').value.trim(),
     note: document.getElementById('fNote').value.trim(),
     store: document.getElementById('fStore').value,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: currentUser.email
   };
-
   if (!data.name) { alert('氏名を入力してください'); return; }
-
   try {
-    if (editId) {
-      await db.collection('patients').doc(editId).update(data);
-    } else {
-      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection('patients').add(data);
-    }
+    if (editId) { await db.collection('patients').doc(editId).update(data); }
+    else { data.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection('patients').add(data); }
     closePatientModal();
     await loadPatients();
     renderTable();
@@ -416,11 +570,8 @@ async function savePatient() {
 
 async function deletePatient(id, name) {
   if (!confirm(`「${name}」を削除しますか？`)) return;
-  try {
-    await db.collection('patients').doc(id).delete();
-    await loadPatients();
-    renderTable();
-  } catch(e) { alert('削除エラー: ' + e.message); }
+  try { await db.collection('patients').doc(id).delete(); await loadPatients(); renderTable(); }
+  catch(e) { alert('削除エラー: ' + e.message); }
 }
 
 // ===== CSV出力 =====
@@ -433,21 +584,18 @@ function exportCSV() {
     (p.name||'').toLowerCase().includes(search) || (p.kana||'').toLowerCase().includes(search) ||
     (p.address||'').toLowerCase().includes(search) || (p.phone||'').includes(search) || (p.patientId||'').includes(search)
   );
-
   const bom = '\uFEFF';
-  let csv = '"患者ID","氏名","カナ","生年月日","性別","郵便番号","住所","電話番号","担当店舗","備考"\n';
+  let csv = '"患者ID","氏名","カナ","生年月日","性別","郵便番号","住所","電話番号","担当店舗","施設","備考"\n';
   filtered.forEach(p => {
-    csv += `"${p.patientId||''}","${p.name||''}","${p.kana||''}","${p.birthday||''}","${p.gender||''}","${p.zip||''}","${p.address||''}","${p.phone||''}","${p.store||''}","${(p.note||'').replace(/"/g,'""')}"\n`;
+    csv += `"${p.patientId||''}","${p.name||''}","${p.kana||''}","${p.birthday||''}","${p.gender||''}","${p.zip||''}","${p.address||''}","${p.phone||''}","${p.store||''}","${p.facility||''}","${(p.note||'').replace(/"/g,'""')}"\n`;
   });
-
   const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = `患者データ_${storeFilter || '全店舗'}_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
 }
 
-// ===== CSVインポート =====
+// ===== CSVインポート（患者マスター） =====
 function openImportModal() { document.getElementById('importModal').classList.add('show'); document.getElementById('importResult').innerHTML = ''; document.getElementById('importFile').value = ''; }
 function closeImportModal() { document.getElementById('importModal').classList.remove('show'); }
 
@@ -463,7 +611,7 @@ function parseCSVLine(line) {
 
 const COL_MAP = {
   '患者id': 'patientId', '患者ID': 'patientId', 'id': 'patientId', 'ID': 'patientId',
-  '氏名': 'name', '名前': 'name', '漢字': 'name', '氏名（漢字）': 'name',
+  '氏名': 'name', '名前': 'name', '漢字': 'name', '氏名（漢字）': 'name', '患者名': 'name',
   'カナ': 'kana', 'フリガナ': 'kana', '氏名（カナ）': 'kana', 'かな': 'kana',
   '生年月日': 'birthday', '誕生日': 'birthday',
   '性別': 'gender',
@@ -471,6 +619,7 @@ const COL_MAP = {
   '住所': 'address',
   '電話番号': 'phone', '電話': 'phone', 'TEL': 'phone',
   '担当店舗': 'store', '店舗': 'store',
+  '施設': 'facility', '分類': 'facility', '施設名': 'facility',
   '備考': 'note', 'メモ': 'note',
 };
 
@@ -485,7 +634,6 @@ async function doImport() {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
 
-    // ヘッダー解析
     const headers = parseCSVLine(lines[0]);
     const colIdx = {};
     headers.forEach((h, i) => {
@@ -494,7 +642,6 @@ async function doImport() {
     });
 
     let added = 0, updated = 0, skipped = 0;
-
     for (let i = 1; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
       if (cols.length < 2) continue;
@@ -503,29 +650,152 @@ async function doImport() {
       Object.entries(colIdx).forEach(([field, idx]) => {
         if (cols[idx] !== undefined) data[field] = cols[idx].replace(/^"|"$/g, '');
       });
-
+      // 半角カナを全角に変換
+      if (data.kana) data.kana = hankakuToZenkaku(data.kana);
       if (!data.name && !data.patientId) { skipped++; continue; }
+      // 全角スペースを正規化
+      if (data.name) data.name = data.name.replace(/\s+/g, '　').trim();
 
       data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
       data.updatedBy = currentUser.email;
 
-      // 患者IDで既存チェック
+      // 照合: 患者ID → 氏名+カナ
+      let existing = null;
       if (data.patientId) {
-        const existing = patients.find(p => p.patientId === data.patientId);
-        if (existing) {
-          await db.collection('patients').doc(existing.id).update(data);
-          updated++;
-          continue;
-        }
+        existing = patients.find(p => p.patientId === data.patientId);
       }
-      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
-      await db.collection('patients').add(data);
-      added++;
+      if (!existing && data.name) {
+        existing = patients.find(p => p.name === data.name && (!data.kana || p.kana === data.kana));
+      }
+
+      if (existing) {
+        await db.collection('patients').doc(existing.id).update(data);
+        updated++;
+      } else {
+        data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+        await db.collection('patients').add(data);
+        added++;
+      }
+    }
+    await loadPatients();
+    renderTable();
+    resultDiv.innerHTML = `<div class="import-result success">完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+  };
+  reader.readAsText(fileInput.files[0], 'UTF-8');
+}
+
+// ===== 請求CSVインポート =====
+function openBillingImportModal() {
+  document.getElementById('billingImportModal').classList.add('show');
+  document.getElementById('billingImportResult').innerHTML = '';
+  document.getElementById('billingFile').value = '';
+  // デフォルト年月を先月に
+  const now = new Date();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  document.getElementById('billingPeriod').value = lastMonth.toISOString().slice(0, 7);
+}
+function closeBillingImportModal() { document.getElementById('billingImportModal').classList.remove('show'); }
+
+async function doBillingImport() {
+  const fileInput = document.getElementById('billingFile');
+  const resultDiv = document.getElementById('billingImportResult');
+  const period = document.getElementById('billingPeriod').value;
+  const store = document.getElementById('billingStore').value;
+
+  if (!fileInput.files.length) { resultDiv.innerHTML = '<div class="import-result error">ファイルを選択してください</div>'; return; }
+  if (!period) { resultDiv.innerHTML = '<div class="import-result error">対象年月を選択してください</div>'; return; }
+
+  resultDiv.innerHTML = '<div class="import-result">取込中...</div>';
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const text = e.target.result.replace(/^\uFEFF/, '');
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 3) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
+
+    // ヘッダー行（0行目）と単位行（1行目）をスキップ
+    // データは2行目から
+    let imported = 0, skipped = 0;
+    const batch = db.batch();
+    const batchSize = 400; // Firestoreバッチ上限は500
+    let batchCount = 0;
+
+    for (let i = 2; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const name = (cols[0] || '').replace(/\s+/g, '　').trim();
+      if (!name || name === '合計' || name === '小計') { skipped++; continue; }
+
+      const kanaRaw = (cols[23] || '').trim();
+      const kana = kanaRaw ? hankakuToZenkaku(kanaRaw) : '';
+      const facility = (cols[22] || '').trim();
+      const insuranceType = (cols[3] || '').trim();
+      const visits = parseInt(cols[4]) || 0;
+      const copay = parseInt(cols[5]) || 0;
+      const careCopay = parseInt(cols[6]) || 0;
+      const billedAmount = parseInt(cols[9]) || 0;
+      const paidAmount = parseInt(cols[10]) || 0;
+      const unpaidAmount = parseInt(cols[11]) || 0;
+      const insuranceTotal = parseInt(cols[12]) || 0;
+      const basePoints = parseInt(cols[13]) || 0;
+      const dispensingPoints = parseInt(cols[15]) || 0;
+      const guidancePoints = parseInt(cols[17]) || 0;
+
+      // 患者マスターとの照合（あれば patientRef を保存）
+      const matched = patients.find(p => p.name === name || (kana && p.kana === kana));
+      const patientRef = matched ? matched.id : null;
+
+      const docData = {
+        name, kana, facility, insuranceType, visits,
+        copay, careCopay, billedAmount, paidAmount, unpaidAmount,
+        insuranceTotal, basePoints, dispensingPoints, guidancePoints,
+        period, store, patientRef,
+        importedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        importedBy: currentUser.email
+      };
+
+      // 同じ period + name + store があれば上書き
+      const docId = `${period}_${store}_${name}`.replace(/[\/\s]/g, '_');
+      const ref = db.collection('billing').doc(docId);
+      batch.set(ref, docData);
+      batchCount++;
+      imported++;
+
+      if (batchCount >= batchSize) {
+        await batch.commit();
+        batchCount = 0;
+      }
+    }
+
+    if (batchCount > 0) await batch.commit();
+
+    // 患者マスターにも未登録の患者を自動追加
+    let newPatients = 0;
+    for (let i = 2; i < lines.length; i++) {
+      const cols = parseCSVLine(lines[i]);
+      const name = (cols[0] || '').replace(/\s+/g, '　').trim();
+      if (!name || name === '合計' || name === '小計') continue;
+      const kanaRaw = (cols[23] || '').trim();
+      const kana = kanaRaw ? hankakuToZenkaku(kanaRaw) : '';
+      const facility = (cols[22] || '').trim();
+
+      const exists = patients.find(p => p.name === name || (kana && p.kana === kana));
+      if (!exists) {
+        await db.collection('patients').add({
+          name, kana, facility, store,
+          patientId: '', birthday: '', gender: '', zip: '', phone: '', address: '', note: '',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedBy: currentUser.email
+        });
+        patients.push({ name, kana, facility, store }); // ローカルキャッシュにも追加（重複防止）
+        newPatients++;
+      }
     }
 
     await loadPatients();
     renderTable();
-    resultDiv.innerHTML = `<div class="import-result success">完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+    await loadBillingData();
+    resultDiv.innerHTML = `<div class="import-result success">完了: 請求データ${imported}件取込, 患者マスター新規${newPatients}件追加${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
   };
   reader.readAsText(fileInput.files[0], 'UTF-8');
 }
