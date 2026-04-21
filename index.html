@@ -655,13 +655,19 @@ const COL_MAP = {
 async function doImport() {
   const fileInput = document.getElementById('importFile');
   const resultDiv = document.getElementById('importResult');
+  const btn = document.querySelector('#importModal .btn-import');
   if (!fileInput.files.length) { resultDiv.innerHTML = '<div class="import-result error">ファイルを選択してください</div>'; return; }
+
+  // UI: ボタン無効化+取込中表示
+  btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = '取込中...';
+  resultDiv.innerHTML = '<div class="import-result" style="background:#fef9e7;color:#7d6608">📂 ファイル読込中...</div>';
 
   const reader = new FileReader();
   reader.onload = async function(e) {
+   try {
     const text = detectAndDecode(e.target.result);
     const lines = text.split(/\r?\n/).filter(l => l.trim());
-    if (lines.length < 2) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
+    if (lines.length < 2) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; btn.disabled = false; btn.style.opacity = ''; btn.textContent = 'インポート実行'; return; }
 
     const headers = parseCSVLine(lines[0]);
     const colIdx = {};
@@ -669,6 +675,9 @@ async function doImport() {
       const clean = h.replace(/^"|"$/g, '').trim();
       if (COL_MAP[clean]) colIdx[COL_MAP[clean]] = i;
     });
+
+    console.log('マッピング結果:', JSON.stringify(colIdx));
+    resultDiv.innerHTML = `<div class="import-result" style="background:#fef9e7;color:#7d6608">⏳ ${lines.length - 1}行を処理中...</div>`;
 
     let added = 0, updated = 0, skipped = 0;
     for (let i = 1; i < lines.length; i++) {
@@ -705,10 +714,21 @@ async function doImport() {
         await db.collection('patients').add(data);
         added++;
       }
+
+      // 50件ごとに進捗表示
+      if ((added + updated + skipped) % 50 === 0) {
+        resultDiv.innerHTML = `<div class="import-result" style="background:#fef9e7;color:#7d6608">⏳ ${added + updated + skipped} / ${lines.length - 1}行 処理中...</div>`;
+      }
     }
     await loadPatients();
     renderTable();
-    resultDiv.innerHTML = `<div class="import-result success">完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+    resultDiv.innerHTML = `<div class="import-result success">✅ 完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+   } catch(err) {
+    console.error('CSVインポートエラー:', err);
+    resultDiv.innerHTML = `<div class="import-result error">❌ エラー: ${err.message}</div>`;
+   } finally {
+    btn.disabled = false; btn.style.opacity = ''; btn.textContent = 'インポート実行';
+   }
   };
   reader.readAsArrayBuffer(fileInput.files[0]);
 }
@@ -735,7 +755,9 @@ async function doBillingImport() {
   if (!period) { resultDiv.innerHTML = '<div class="import-result error">対象年月を選択してください</div>'; return; }
   if (!store) { resultDiv.innerHTML = '<div class="import-result error">店舗を選択してください</div>'; return; }
 
-  resultDiv.innerHTML = '<div class="import-result">取込中...</div>';
+  const btn = document.querySelector('#billingImportModal .btn-billing');
+  btn.disabled = true; btn.style.opacity = '0.5'; btn.textContent = '取込中...';
+  resultDiv.innerHTML = '<div class="import-result" style="background:#fef9e7;color:#7d6608">📂 ファイル読込中...</div>';
 
   const reader = new FileReader();
   reader.onload = async function(e) {
@@ -849,7 +871,9 @@ async function doBillingImport() {
     resultDiv.innerHTML = `<div class="import-result success">完了: 請求データ${imported}件取込, 患者マスター新規${newPatients}件追加${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
    } catch(err) {
     console.error('請求CSV取込エラー:', err);
-    resultDiv.innerHTML = `<div class="import-result error">エラー: ${err.message}</div>`;
+    resultDiv.innerHTML = `<div class="import-result error">❌ エラー: ${err.message}</div>`;
+   } finally {
+    btn.disabled = false; btn.style.opacity = ''; btn.textContent = '取込実行';
    }
   };
   reader.readAsArrayBuffer(fileInput.files[0]);
