@@ -732,11 +732,13 @@ async function doBillingImport() {
 
   if (!fileInput.files.length) { resultDiv.innerHTML = '<div class="import-result error">ファイルを選択してください</div>'; return; }
   if (!period) { resultDiv.innerHTML = '<div class="import-result error">対象年月を選択してください</div>'; return; }
+  if (!store) { resultDiv.innerHTML = '<div class="import-result error">店舗を選択してください</div>'; return; }
 
   resultDiv.innerHTML = '<div class="import-result">取込中...</div>';
 
   const reader = new FileReader();
   reader.onload = async function(e) {
+   try {
     const text = detectAndDecode(e.target.result);
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 3) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
@@ -844,6 +846,10 @@ async function doBillingImport() {
     renderTable();
     await loadBillingData();
     resultDiv.innerHTML = `<div class="import-result success">完了: 請求データ${imported}件取込, 患者マスター新規${newPatients}件追加${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
+   } catch(err) {
+    console.error('請求CSV取込エラー:', err);
+    resultDiv.innerHTML = `<div class="import-result error">エラー: ${err.message}</div>`;
+   }
   };
   reader.readAsArrayBuffer(fileInput.files[0]);
 }
