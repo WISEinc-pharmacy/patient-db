@@ -744,7 +744,7 @@ async function doBillingImport() {
     // ヘッダー行（0行目）と単位行（1行目）をスキップ
     // データは2行目から
     let imported = 0, skipped = 0;
-    const batch = db.batch();
+    let batch = db.batch();
     const batchSize = 400; // Firestoreバッチ上限は500
     let batchCount = 0;
 
@@ -756,26 +756,42 @@ async function doBillingImport() {
       const kanaRaw = (cols[23] || '').trim();
       const kana = kanaRaw ? hankakuToZenkaku(kanaRaw) : '';
       const facility = (cols[22] || '').trim();
+      const csvPatientId = (cols[21] || '').trim();
       const insuranceType = (cols[3] || '').trim();
+      const copayRatio = parseInt(cols[2]) || 0;
       const visits = parseInt(cols[4]) || 0;
       const copay = parseInt(cols[5]) || 0;
       const careCopay = parseInt(cols[6]) || 0;
+      const selectTherapy = parseInt(cols[7]) || 0;
+      const selfPayDrug = parseInt(cols[8]) || 0;
       const billedAmount = parseInt(cols[9]) || 0;
       const paidAmount = parseInt(cols[10]) || 0;
       const unpaidAmount = parseInt(cols[11]) || 0;
       const insuranceTotal = parseInt(cols[12]) || 0;
       const basePoints = parseInt(cols[13]) || 0;
+      const timePoints = parseInt(cols[14]) || 0;
       const dispensingPoints = parseInt(cols[15]) || 0;
+      const dispensingAddPoints = parseInt(cols[16]) || 0;
       const guidancePoints = parseInt(cols[17]) || 0;
+      const oralMedPoints = parseInt(cols[18]) || 0;
+      const externalMedPoints = parseInt(cols[19]) || 0;
+      const materialPoints = parseInt(cols[20]) || 0;
+      const selectTherapyAmount = parseInt(cols[24]) || 0;
+      const selectTherapyTax = parseInt(cols[25]) || 0;
 
-      // 患者マスターとの照合（あれば patientRef を保存）
-      const matched = patients.find(p => p.name === name || (kana && p.kana === kana));
+      // 患者マスターとの照合: csvPatientId → name/kana の順
+      let matched = null;
+      if (csvPatientId) matched = patients.find(p => p.patientId === csvPatientId);
+      if (!matched) matched = patients.find(p => p.name === name || (kana && p.kana === kana));
       const patientRef = matched ? matched.id : null;
 
       const docData = {
-        name, kana, facility, insuranceType, visits,
-        copay, careCopay, billedAmount, paidAmount, unpaidAmount,
-        insuranceTotal, basePoints, dispensingPoints, guidancePoints,
+        name, kana, facility, csvPatientId, insuranceType, copayRatio, visits,
+        copay, careCopay, selectTherapy, selfPayDrug,
+        billedAmount, paidAmount, unpaidAmount, insuranceTotal,
+        basePoints, timePoints, dispensingPoints, dispensingAddPoints,
+        guidancePoints, oralMedPoints, externalMedPoints, materialPoints,
+        selectTherapyAmount, selectTherapyTax,
         period, store, patientRef,
         importedAt: firebase.firestore.FieldValue.serverTimestamp(),
         importedBy: currentUser.email
@@ -790,6 +806,7 @@ async function doBillingImport() {
 
       if (batchCount >= batchSize) {
         await batch.commit();
+        batch = db.batch(); // バッチをリセット
         batchCount = 0;
       }
     }
@@ -805,12 +822,15 @@ async function doBillingImport() {
       const kanaRaw = (cols[23] || '').trim();
       const kana = kanaRaw ? hankakuToZenkaku(kanaRaw) : '';
       const facility = (cols[22] || '').trim();
+      const csvPatientId = (cols[21] || '').trim();
 
-      const exists = patients.find(p => p.name === name || (kana && p.kana === kana));
+      let exists = null;
+      if (csvPatientId) exists = patients.find(p => p.patientId === csvPatientId);
+      if (!exists) exists = patients.find(p => p.name === name || (kana && p.kana === kana));
       if (!exists) {
         await db.collection('patients').add({
           name, kana, facility, store,
-          patientId: '', birthday: '', gender: '', zip: '', phone: '', address: '', note: '',
+          patientId: csvPatientId, birthday: '', gender: '', zip: '', phone: '', address: '', note: '',
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedBy: currentUser.email
