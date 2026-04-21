@@ -595,6 +595,34 @@ function exportCSV() {
   a.click();
 }
 
+// ===== エンコーディング自動検出 =====
+function detectAndDecode(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  // BOM検出
+  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    return new TextDecoder('utf-8').decode(bytes.slice(3));
+  }
+  // UTF-8かShift-JISかを判定（日本語バイト列のパターンで推定）
+  let isUtf8 = true;
+  for (let i = 0; i < Math.min(bytes.length, 10000); i++) {
+    if (bytes[i] >= 0x80) {
+      // UTF-8マルチバイトチェック
+      if (bytes[i] >= 0xC0 && bytes[i] < 0xE0) {
+        if (i + 1 >= bytes.length || (bytes[i+1] & 0xC0) !== 0x80) { isUtf8 = false; break; }
+        i += 1;
+      } else if (bytes[i] >= 0xE0 && bytes[i] < 0xF0) {
+        if (i + 2 >= bytes.length || (bytes[i+1] & 0xC0) !== 0x80 || (bytes[i+2] & 0xC0) !== 0x80) { isUtf8 = false; break; }
+        i += 2;
+      } else if (bytes[i] >= 0x80 && bytes[i] < 0xC0) {
+        isUtf8 = false; break;
+      }
+    }
+  }
+  const encoding = isUtf8 ? 'utf-8' : 'shift-jis';
+  console.log('検出エンコーディング:', encoding);
+  return new TextDecoder(encoding).decode(arrayBuffer);
+}
+
 // ===== CSVインポート（患者マスター） =====
 function openImportModal() { document.getElementById('importModal').classList.add('show'); document.getElementById('importResult').innerHTML = ''; document.getElementById('importFile').value = ''; }
 function closeImportModal() { document.getElementById('importModal').classList.remove('show'); }
@@ -630,7 +658,7 @@ async function doImport() {
 
   const reader = new FileReader();
   reader.onload = async function(e) {
-    const text = e.target.result.replace(/^\uFEFF/, '');
+    const text = detectAndDecode(e.target.result);
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 2) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
 
@@ -652,9 +680,9 @@ async function doImport() {
       });
       // 半角カナを全角に変換
       if (data.kana) data.kana = hankakuToZenkaku(data.kana);
+      // 名前の全角スペース正規化 + 空白のみの値を除外
+      if (data.name) data.name = data.name.replace(/[\s\u3000]+/g, '　').replace(/^　+|　+$/g, '');
       if (!data.name && !data.patientId) { skipped++; continue; }
-      // 全角スペースを正規化
-      if (data.name) data.name = data.name.replace(/\s+/g, '　').trim();
 
       data.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
       data.updatedBy = currentUser.email;
@@ -681,7 +709,7 @@ async function doImport() {
     renderTable();
     resultDiv.innerHTML = `<div class="import-result success">完了: 新規${added}件, 更新${updated}件${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
   };
-  reader.readAsText(fileInput.files[0], 'UTF-8');
+  reader.readAsArrayBuffer(fileInput.files[0]);
 }
 
 // ===== 請求CSVインポート =====
@@ -709,7 +737,7 @@ async function doBillingImport() {
 
   const reader = new FileReader();
   reader.onload = async function(e) {
-    const text = e.target.result.replace(/^\uFEFF/, '');
+    const text = detectAndDecode(e.target.result);
     const lines = text.split(/\r?\n/).filter(l => l.trim());
     if (lines.length < 3) { resultDiv.innerHTML = '<div class="import-result error">データがありません</div>'; return; }
 
@@ -722,7 +750,7 @@ async function doBillingImport() {
 
     for (let i = 2; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
-      const name = (cols[0] || '').replace(/\s+/g, '　').trim();
+      const name = (cols[0] || '').replace(/[\s\u3000]+/g, '　').replace(/^　+|　+$/g, '');
       if (!name || name === '合計' || name === '小計') { skipped++; continue; }
 
       const kanaRaw = (cols[23] || '').trim();
@@ -772,7 +800,7 @@ async function doBillingImport() {
     let newPatients = 0;
     for (let i = 2; i < lines.length; i++) {
       const cols = parseCSVLine(lines[i]);
-      const name = (cols[0] || '').replace(/\s+/g, '　').trim();
+      const name = (cols[0] || '').replace(/[\s\u3000]+/g, '　').replace(/^　+|　+$/g, '');
       if (!name || name === '合計' || name === '小計') continue;
       const kanaRaw = (cols[23] || '').trim();
       const kana = kanaRaw ? hankakuToZenkaku(kanaRaw) : '';
@@ -797,7 +825,7 @@ async function doBillingImport() {
     await loadBillingData();
     resultDiv.innerHTML = `<div class="import-result success">完了: 請求データ${imported}件取込, 患者マスター新規${newPatients}件追加${skipped ? ', スキップ' + skipped + '件' : ''}</div>`;
   };
-  reader.readAsText(fileInput.files[0], 'UTF-8');
+  reader.readAsArrayBuffer(fileInput.files[0]);
 }
 </script>
 </body>
