@@ -333,8 +333,16 @@ async function checkUserRole(user) {
   if (doc.exists) { userRole = doc.data().role || 'viewer'; }
   else {
     const snap = await db.collection('users').get();
-    userRole = snap.empty ? 'admin' : 'viewer';
-    await db.collection('users').doc(user.email).set({ email: user.email, name: user.displayName || '', role: userRole, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    if (snap.empty) {
+      // 最初のユーザーは管理者として自動登録
+      userRole = 'admin';
+      await db.collection('users').doc(user.email).set({ email: user.email, name: user.displayName || '', role: userRole, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+      // 未登録ユーザーはアクセス拒否
+      await firebase.auth().signOut();
+      alert('アクセス権がありません。\n利用を希望される方は director@wise-jmco.com へご連絡ください。');
+      return;
+    }
   }
   const badge = document.getElementById('roleBadge');
   badge.textContent = userRole === 'admin' ? '管理者' : userRole === 'editor' ? '編集者' : '閲覧者';
